@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Manutenção de Computadores</title>
+<link rel="stylesheet" href="styles.css">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+<script>
+  // 🔥 Configuração Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWMeGoDass7ZZKbsN7ogX7ZKxTTApprtg",
+    authDomain: "inventario-impressoras-2ecbd.firebaseapp.com",
+    projectId: "inventario-impressoras-2ecbd",
+    storageBucket: "inventario-impressoras-2ecbd.firebasestorage.app",
+    messagingSenderId: "993025022167",
+    appId: "1:993025022167:web:94c62eac0cfa96ddc1f892",
+    measurementId: "G-459GNX2RGH"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
+
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--accent:#0b63d6;--muted:#6b7280}
+*{box-sizing:border-box}
+body{font-family:Inter, system-ui; margin:0; background:var(--bg); color:#111}
+header{background:linear-gradient(90deg,#0b63d6 0%, #1aa1ff 100%); color:#fff; padding:18px 20px}
+.container{max-width:980px; margin:20px auto; padding:0 16px}
+nav a{color:#fff; margin-right:12px; text-decoration:none; font-weight:600}
+.card{background:var(--card); padding:18px; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.06);}
+h1,h2{margin:0 0 8px 0}
+form .row{display:flex; gap:12px; margin-bottom:12px}
+label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+input[type=text], input[type=date], select, textarea{width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e6e9ef}
+button{background:var(--accent); color:#fff; padding:10px 12px; border:0; border-radius:8px; cursor:pointer}
+.small{font-size:13px; padding:7px 10px}
+.search{padding:10px 12px; border-radius:8px; border:1px solid #e6e9ef;}
+.controls{display:flex; gap:8px; align-items:center}
+table{width:100%; border-collapse:collapse}
+th,td{padding:10px 8px; text-align:left; border-bottom:1px solid #f1f3f7; font-size:14px}
+.muted{color:var(--muted); font-size:13px}
+footer{max-width:980px; margin:22px auto; color:var(--muted); font-size:13px; text-align:center}
+.toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0b63d6; color:#fff; padding:12px 18px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); animation:fadeInOut 3s ease forwards; z-index:9999}
+.toast.error{background:#e11d48}
+.status-tag{display:inline-block; padding:6px 10px; border-radius:8px; font-weight:600; color:#fff}
+/* Estilo dos status com mais destaque e espaçamento */
+.status-em,
+.status-ok {
+  display: inline-block;
+  padding: 8px 14px;            /* 🔹 Mais espaçamento interno */
+  border-radius: 8px;
+  font-weight: 600;
+  color: #fff;
+  transition: all 0.25s ease;   /* 🔹 Transição suave ao mudar */
+  margin: 2px 4px;              /* 🔹 Pequeno espaçamento externo */
+}
+
+.status-em { background: #e11d48; }  /* Vermelho */
+.status-ok { background: #16a34a; }  /* Verde */
+  /* Aumenta a largura da coluna de status */
+#tabela th:nth-child(6),
+#tabela td:nth-child(6) {
+  width: 180px;      /* 🔹 Ajuste conforme quiser (ex: 160–220px) */
+  text-align: center;
+}
+
+
+@keyframes fadeInOut{0%{opacity:0;transform:translate(-50%,30px)}10%,90%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,30px)}}
+@media(max-width:700px){.row{flex-direction:column}}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between">
+    <div><h1 style="font-size:20px;margin:0">Manutenção de Computadores</h1></div>
+    <nav>
+      <a href="#" id="menuCadastro">Cadastro</a>
+      <a href="#" id="menuConsulta">Consulta</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- CADASTRO -->
+  <div id="paginaCadastro" class="card">
+    <h2>📋 Cadastrar Manutenção</h2>
+    <form id="formCadastro">
+      <div class="row">
+        <div style="flex:1">
+          <label>ID da Máquina (gerado automaticamente)</label>
+          <input type="text" id="idMaquina" readonly style="background:#f8f8f8">
+        </div>
+        <div style="flex:1">
+          <label>Data de Entrada</label>
+          <input type="date" id="dataEntrada">
+        </div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label>Setor / Unidade Escolar</label>
+          <input type="text" id="setor" required placeholder="Ex: Escola Central">
+        </div>
+        <div style="flex:1">
+          <label>Status</label>
+          <select id="status">
+            <option value="Em manutenção">Em manutenção</option>
+            <option value="Concluído">Concluído</option>
+            <option value="Concluído, ainda na SEDUC">Concluído, ainda na SEDUC</option>
+             <option value="Reserva">Reserva</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label>Problema</label>
+          <textarea id="problema" rows="2" required placeholder="Descreva o problema..."></textarea>
+        </div>
+        <div style="flex:1">
+          <label>Solução</label>
+          <textarea id="solucao" rows="2" placeholder="Descreva a solução..."></textarea>
+        </div>
+      </div>
+
+      <div class="row">
+        <div style="flex:1">
+          <label>Data de Saída</label>
+          <input type="date" id="dataSaida">
+        </div>
+        <div style="flex:1">
+          <label>Técnico Responsável</label>
+          <input type="text" id="tecnico" placeholder="Nome do técnico">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        <button type="submit">Salvar Manutenção</button>
+        <button type="reset" class="small" style="background:#efefef;color:#111">Limpar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- CONSULTA -->
+  <div id="paginaConsulta" class="card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <h2>🔍 Consultar Máquinas</h2>
+        <div class="muted">Edite diretamente na tabela e clique em "Salvar alterações".</div>
+      </div>
+      <div class="controls">
+  <input id="search" class="search" placeholder="Pesquisar por ID, setor ou técnico">
+  <input type="month" id="mesFiltro" class="search" title="Filtrar por mês">
+  <button id="saveBtn" class="small">Salvar alterações</button>
+  <button id="printBtn" class="small">Imprimir relatório</button>
+</div>
+
+    </div>
+
+    <div style="overflow:auto">
+      <table id="tabela">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Entrada</th>
+            <th>Setor</th>
+            <th>Problema</th>
+            <th>Solução</th>
+            <th>Status</th>
+            <th>Saída</th>
+            <th>Técnico</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>Feito com ❤️ — Sistema de Manutenção</footer>
+
+<!-- SCRIPT FUNCIONAL -->
+<script>
+function showMessage(msg,type="success"){
+  const t=document.createElement("div");
+  t.className=`toast ${type}`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+// Gera ID automático
+async function gerarIdMaquina(){
+  const hoje=new Date();
+  const dataStr=hoje.toISOString().slice(0,10).replace(/-/g,"");
+  const snap=await db.collection("manutencoes").where("dataId","==",dataStr).get();
+  const contador=(snap.size+1).toString().padStart(3,"0");
+  return { id:`PC-${dataStr}-${contador}`, dataId:dataStr };
+}
+
+window.addEventListener("DOMContentLoaded", async ()=>{
+  const paginaCadastro=document.getElementById("paginaCadastro");
+  const paginaConsulta=document.getElementById("paginaConsulta");
+  const idInput=document.getElementById("idMaquina");
+  const form=document.getElementById("formCadastro");
+
+  // Gera primeiro ID
+  const novo=await gerarIdMaquina();
+  idInput.value=novo.id;
+
+  // Alternar menus
+  document.getElementById("menuCadastro").onclick=async()=>{
+    paginaCadastro.style.display="block";
+    paginaConsulta.style.display="none";
+    const n=await gerarIdMaquina();
+    idInput.value=n.id;
+  };
+  document.getElementById("menuConsulta").onclick=()=>{
+    paginaCadastro.style.display="none";
+    paginaConsulta.style.display="block";
+    carregarDados();
+  };
+
+  // Salvar manutenção
+  form.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const data={
+      idMaquina:idInput.value.trim(),
+      dataEntrada:document.getElementById("dataEntrada").value,
+      setor:document.getElementById("setor").value.trim(),
+      problema:document.getElementById("problema").value.trim(),
+      solucao:document.getElementById("solucao").value.trim(),
+      status:document.getElementById("status").value,
+      dataSaida:document.getElementById("dataSaida").value,
+      tecnico:document.getElementById("tecnico").value.trim(),
+      dataCadastro:new Date(),
+      dataId:idInput.value.split("-")[1]
+    };
+    try{
+      await db.collection("manutencoes").add(data);
+      showMessage("✅ Manutenção cadastrada com sucesso!");
+      form.reset();
+      const novo=await gerarIdMaquina();
+      idInput.value=novo.id;
+    }catch(err){
+      console.error(err);
+      showMessage("Erro ao salvar!","error");
+    }
+  });
+
+  // Consulta
+  let manutencoes=[];
+  async function carregarDados(){
+    const tbody=document.querySelector("#tabela tbody");
+    tbody.innerHTML="<tr><td colspan='9'>Carregando...</td></tr>";
+    const snap=await db.collection("manutencoes").orderBy("dataCadastro","desc").get();
+    manutencoes=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTabela(manutencoes);
+  }
+
+  function renderTabela(lista){
+    const tbody=document.querySelector("#tabela tbody");
+    if(lista.length===0){tbody.innerHTML="<tr><td colspan='9'>Nenhum registro encontrado.</td></tr>";return;}
+    tbody.innerHTML="";
+    lista.forEach(item=>{
+      const tr=document.createElement("tr");
+      const statusClass=item.status==="Concluído"?"status-ok":"status-em";
+      tr.innerHTML=`
+        <td>${item.idMaquina||""}</td>
+        <td contenteditable data-field="dataEntrada">${item.dataEntrada||""}</td>
+        <td contenteditable data-field="setor">${item.setor||""}</td>
+        <td contenteditable data-field="problema">${item.problema||""}</td>
+        <td contenteditable data-field="solucao">${item.solucao||""}</td>
+        <td>
+          <select data-field="status" class="${statusClass}">
+            <option value="Em manutenção" ${item.status==="Em manutenção"?"selected":""}>Em manutenção</option>
+            <option value="Concluído" ${item.status==="Concluído"?"selected":""}>Concluído</option>
+            <option value="Concluído, ainda na SEDUC" ${item.status==="Concluído, ainda na SEDUC"?"selected":""}>Concluído, ainda na SEDUC</option>
+            <option value="Reserva" ${item.status==="Reserva"?"selected":""}>Reserva</option>
+          </select>
+        </td>
+        <td contenteditable data-field="dataSaida">${item.dataSaida||""}</td>
+        <td contenteditable data-field="tecnico">${item.tecnico||""}</td>
+        <td><button class="small excluirBtn" data-id="${item.id}">Excluir</button></td>
+      `;
+      tbody.appendChild(tr);
+
+      // muda cor ao alterar status
+      const select = tr.querySelector("select[data-field='status']");
+      select.onchange = () => {
+        select.className = (select.value === "Concluído") ? "status-ok" : "status-em";
+      };
+      select.className = (select.value === "Concluído") ? "status-ok" : "status-em";
+    });
+
+    // Botão excluir
+    document.querySelectorAll(".excluirBtn").forEach(btn=>{
+      btn.onclick=async()=>{
+        if(confirm("Excluir este registro?")){
+          await db.collection("manutencoes").doc(btn.dataset.id).delete();
+          showMessage("Registro excluído!");
+          carregarDados();
+        }
+      };
+    });
+  }
+
+  // Botão salvar alterações
+  document.getElementById("saveBtn").onclick=async()=>{
+    const linhas=document.querySelectorAll("#tabela tbody tr");
+    for(const [i,tr] of linhas.entries()){
+      const id=manutencoes[i]?.id;
+      if(!id)continue;
+      const dados={};
+      tr.querySelectorAll("[data-field]").forEach(el=>{
+        dados[el.dataset.field]=el.tagName==="SELECT"?el.value:el.innerText.trim();
+      });
+      await db.collection("manutencoes").doc(id).update(dados);
+    }
+    showMessage("Alterações salvas!");
+    carregarDados();
+  };
+
+  // Campo de busca (por texto ou mês)
+ // 🔍 Filtro por texto (ID, setor, técnico)
+const campoBusca = document.getElementById("search");
+const campoMes = document.getElementById("mesFiltro");
+
+function aplicarFiltros() {
+  const termo = campoBusca.value.toLowerCase();
+  const mesSelecionado = campoMes.value; // formato yyyy-MM
+
+  const filtradas = manutencoes.filter(m => {
+    const mesEntrada = m.dataEntrada?.slice(0,7);
+    const mesSaida = m.dataSaida?.slice(0,7);
+    const correspondeTexto =
+      m.idMaquina?.toLowerCase().includes(termo) ||
+      m.setor?.toLowerCase().includes(termo) ||
+      m.tecnico?.toLowerCase().includes(termo);
+    const correspondeMes =
+      !mesSelecionado || mesEntrada === mesSelecionado || mesSaida === mesSelecionado;
+
+    return correspondeTexto && correspondeMes;
+  });
+
+  renderTabela(filtradas);
+}
+
+campoBusca.addEventListener("input", aplicarFiltros);
+campoMes.addEventListener("change", aplicarFiltros);
+
+
+  // Imprimir relatório
+  document.getElementById("printBtn").onclick=()=>{
+    const win=window.open("","_blank");
+    const em=manutencoes.filter(m=>m.status==="Em manutenção").length;
+    const ok=manutencoes.filter(m=>m.status==="Concluído").length;
+    const reserva=manutencoes.filter(m=>m.status==="Reserva").length;
+    win.document.write("<html><head><title>Relatório de Manutenções</title><style>table{width:100%;border-collapse:collapse;}th,td{border:1px solid #333;padding:8px;text-align:left;}</style></head><body>");
+    win.document.write("<h2>Relatório de Manutenções</h2>");
+    win.document.write(`<p>Total: ${manutencoes.length} | Em manutenção: ${em} | Concluídas: ${ok} | Reserva: ${reserva}</p>`);
+    win.document.write(document.getElementById("tabela").outerHTML);
+    win.document.write("</body></html>");
+    win.document.close();
+    win.print();
+  };
+});
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
